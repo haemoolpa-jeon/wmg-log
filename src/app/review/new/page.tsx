@@ -95,11 +95,14 @@ export default function NewReviewPage() {
         backgroundColor: '#fffbeb',
         useCORS: true,
         logging: false,
+        ignoreElements: (element) => element.tagName === 'STYLE',
       })
       const link = document.createElement('a')
       link.download = `${whisky.name || 'review'}.png`
       link.href = canvas.toDataURL('image/png')
       link.click()
+    } catch (e) {
+      console.warn('Export error:', e)
     } finally {
       setExporting(false)
     }
@@ -114,6 +117,7 @@ export default function NewReviewPage() {
         backgroundColor: '#fffbeb',
         useCORS: true,
         logging: false,
+        ignoreElements: (element) => element.tagName === 'STYLE',
       })
       const imgData = canvas.toDataURL('image/png')
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -121,6 +125,8 @@ export default function NewReviewPage() {
       const h = (canvas.height * w) / canvas.width
       pdf.addImage(imgData, 'PNG', 10, 10, w, h)
       pdf.save(`${whisky.name || 'review'}.pdf`)
+    } catch (e) {
+      console.warn('Export error:', e)
     } finally {
       setExporting(false)
     }
@@ -157,40 +163,35 @@ export default function NewReviewPage() {
           </div>
         </div>
 
-        {/* Export Card - using inline styles for html2canvas compatibility */}
-        <div ref={cardRef} style={{ backgroundColor: '#fffbeb' }} className="rounded-xl border border-amber-200 overflow-hidden mb-4">
-          <div style={{ backgroundColor: '#fef3c7' }} className="px-4 py-3 flex items-center justify-between border-b border-amber-200">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🥃</span>
-            </div>
-            <div className="text-sm" style={{ color: '#b45309' }}>📅 {new Date().toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US')}</div>
+        {/* Export Card - all inline styles for html2canvas */}
+        <div ref={cardRef} style={{ backgroundColor: '#fffbeb', borderRadius: '12px', border: '1px solid #fcd34d', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#fef3c7', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #fcd34d' }}>
+            <span style={{ fontSize: '20px' }}>🥃</span>
+            <span style={{ fontSize: '14px', color: '#b45309' }}>📅 {new Date().toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US')}</span>
           </div>
 
           {/* Whisky Info with Color */}
-          <div style={{ backgroundColor: '#fef9e7' }} className="px-4 py-3 border-b border-amber-200">
-            <div className="flex gap-3">
-              <div 
-                className="w-12 h-16 rounded-lg flex-shrink-0"
-                style={{ backgroundColor: colorInfo?.hex, border: '2px solid #fcd34d' }}
-              />
-              <div className="flex-1">
-                <div className="flex items-start justify-between">
+          <div style={{ backgroundColor: '#fef9e7', padding: '12px 16px', borderBottom: '1px solid #fcd34d' }}>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ width: '48px', height: '64px', borderRadius: '8px', border: '2px solid #fcd34d', flexShrink: 0, backgroundColor: colorInfo?.hex }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <p className="font-bold" style={{ color: '#111827' }}>
-                      {whisky.country && <span className="mr-1">{getCountryFlag(whisky.country)}</span>}
+                    <p style={{ fontWeight: 'bold', color: '#111827', margin: 0 }}>
+                      {whisky.country && <span style={{ marginRight: '4px' }}>{getCountryFlag(whisky.country)}</span>}
                       {whisky.name}
                     </p>
-                    <p className="text-sm" style={{ color: '#4b5563' }}>{whisky.distillery}</p>
-                    <div className="flex flex-wrap gap-2 text-xs mt-1" style={{ color: '#6b7280' }}>
+                    <p style={{ fontSize: '14px', color: '#4b5563', margin: '2px 0' }}>{whisky.distillery}</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
                       {whisky.age && <span>{whisky.age}{lang === 'ko' ? '년' : 'Y'}</span>}
                       {whisky.abv && <span>{whisky.abv}%</span>}
                       {whisky.cask && <span>{whisky.cask}</span>}
                       <span>{colorInfo?.name[lang]}</span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold" style={{ color: '#b45309' }}>{total}</div>
-                    <div className="text-xs" style={{ color: '#6b7280' }}>/100</div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#b45309' }}>{total}</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>/100</div>
                   </div>
                 </div>
               </div>
@@ -198,12 +199,12 @@ export default function NewReviewPage() {
           </div>
 
           {/* Scores */}
-          <div className="px-4 py-3 border-b border-amber-200" style={{ backgroundColor: '#ffffff' }}>
-            <div className="grid grid-cols-4 gap-2 text-center">
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #fcd34d', backgroundColor: '#ffffff' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', textAlign: 'center' }}>
               {(['nose', 'palate', 'finish', 'balance'] as const).map(key => (
                 <div key={key}>
-                  <div className="text-lg font-bold" style={{ color: '#d97706' }}>{scores[key]}</div>
-                  <div className="text-[10px]" style={{ color: '#6b7280' }}>{labels[key][lang]}</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#d97706' }}>{scores[key]}</div>
+                  <div style={{ fontSize: '10px', color: '#6b7280' }}>{labels[key][lang]}</div>
                 </div>
               ))}
             </div>
@@ -211,23 +212,23 @@ export default function NewReviewPage() {
 
           {(['nose', 'palate', 'finish'] as const).map(key => (
             (flavors[key].length > 0 || notes[key]) && (
-              <div key={key} className="px-4 py-4 border-b border-amber-200" style={{ backgroundColor: '#ffffff' }}>
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-bold" style={{ color: '#1f2937' }}>{labels[key][lang]}</h3>
+              <div key={key} style={{ padding: '16px', borderBottom: '1px solid #fcd34d', backgroundColor: '#ffffff' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                  <h3 style={{ fontWeight: 'bold', color: '#1f2937', margin: 0 }}>{labels[key][lang]}</h3>
                 </div>
-                <div className="flex gap-4">
+                <div style={{ display: 'flex', gap: '16px' }}>
                   {flavors[key].length > 0 && (
-                    <div className="flex-shrink-0">
+                    <div style={{ flexShrink: 0 }}>
                       <FlavorRadar flavors={flavors[key]} lang={lang} size={130} />
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     {flavors[key].length > 0 && (
-                      <p className="text-xs mb-2" style={{ color: '#6b7280' }}>
+                      <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>
                         {flavors[key].map(f => getTagName(f.id, lang)).join(' / ')}
                       </p>
                     )}
-                    {notes[key] && <p className="text-sm whitespace-pre-wrap" style={{ color: '#374151' }}>{notes[key]}</p>}
+                    {notes[key] && <p style={{ fontSize: '14px', color: '#374151', whiteSpace: 'pre-wrap', margin: 0 }}>{notes[key]}</p>}
                   </div>
                 </div>
               </div>
@@ -235,10 +236,14 @@ export default function NewReviewPage() {
           ))}
 
           {/* Footer with reviewer */}
-          <div className="px-4 py-3 flex items-center justify-between text-xs" style={{ backgroundColor: '#fef9e7', color: '#6b7280' }}>
-            {reviewer && <span>by {reviewer}</span>}
-          </div>
+          {reviewer && (
+            <div style={{ padding: '12px 16px', backgroundColor: '#fef9e7', fontSize: '12px', color: '#6b7280' }}>
+              by {reviewer}
+            </div>
+          )}
         </div>
+
+        <div style={{ marginBottom: '16px' }} />
 
         <div className="grid grid-cols-2 gap-3 mb-3">
           <button onClick={handleExportPNG} disabled={exporting} className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50">
