@@ -4,13 +4,13 @@ import { useState, useRef, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { FlavorWheel } from '@/components/FlavorWheel'
 import { ColorPicker } from '@/components/ColorPicker'
-import { FlavorRadar } from '@/components/FlavorRadar'
-import { flavorData, getTagName, whiskyColors, Lang } from '@/lib/flavors'
-import { countries, getCountryFlag, correctText } from '@/lib/countries'
-import { storage, FlavorWithStrength } from '@/lib/storage'
+import { ExportCard } from '@/components/ExportCard'
+import { flavorData, Lang } from '@/lib/flavors'
+import { countries, correctText } from '@/lib/countries'
+import { storage, FlavorWithStrength, BottlingType } from '@/lib/storage'
 import { domToPng } from 'modern-screenshot'
 import { jsPDF } from 'jspdf'
-import { Download, Image, FileText, ChevronLeft, Globe, Sparkles } from 'lucide-react'
+import { ChevronLeft, Globe, Sparkles } from 'lucide-react'
 
 const labels = {
   nose: { ko: '노즈', en: 'Nose' },
@@ -23,10 +23,8 @@ const ui = {
   editReview: { ko: '리뷰 수정', en: 'Edit Review' },
   whiskyInfo: { ko: '위스키 정보', en: 'Whisky Info' },
   reviewer: { ko: '리뷰어', en: 'Reviewer' },
-  reviewerPlaceholder: { ko: '이름 또는 닉네임', en: 'Name or nickname' },
   whiskyName: { ko: '위스키 이름', en: 'Whisky Name' },
   distillery: { ko: '증류소', en: 'Distillery' },
-  country: { ko: '국가', en: 'Country' },
   selectCountry: { ko: '국가 선택', en: 'Select Country' },
   age: { ko: '숙성 연수', en: 'Age' },
   abv: { ko: '도수 (%)', en: 'ABV (%)' },
@@ -43,6 +41,25 @@ const ui = {
   aiCorrect: { ko: 'AI 교정', en: 'AI Fix' },
   correcting: { ko: '교정 중...', en: 'Fixing...' },
   back: { ko: '목록', en: 'Back' },
+  optional: { ko: '선택사항', en: 'Optional' },
+  official: { ko: '오피셜', en: 'Official' },
+  ib: { ko: '인디펜던트', en: 'Independent' },
+  singleCask: { ko: '싱글캐스크', en: 'Single Cask' },
+  bottleNumber: { ko: '보틀 넘버', en: 'Bottle #' },
+  price: { ko: '가격', en: 'Price' },
+  purchaseDate: { ko: '구매일', en: 'Purchase Date' },
+  openingDate: { ko: '개봉일', en: 'Opening Date' },
+  wouldRebuy: { ko: '재구매 의향', en: 'Would Rebuy?' },
+  yes: { ko: '예', en: 'Yes' },
+  no: { ko: '아니오', en: 'No' },
+  maybe: { ko: '글쎄', en: 'Maybe' },
+  overall: { ko: '총평', en: 'Overall' },
+  overallNote: { ko: '전체적인 인상...', en: 'Overall impression...' },
+}
+
+type Whisky = {
+  name: string; distillery: string; country: string; age: string; abv: string; cask: string; color: number
+  bottlingType?: BottlingType; bottleNumber?: string; price?: string; purchaseDate?: string; openingDate?: string
 }
 
 export default function EditReviewPage() {
@@ -51,12 +68,11 @@ export default function EditReviewPage() {
   const [lang, setLang] = useState<Lang>('ko')
   const [step, setStep] = useState<'form' | 'preview'>('form')
   const [reviewer, setReviewer] = useState('')
-  const [whisky, setWhisky] = useState({ name: '', distillery: '', country: '', age: '', abv: '', cask: '', color: 0.7 })
+  const [whisky, setWhisky] = useState<Whisky>({ name: '', distillery: '', country: '', age: '', abv: '', cask: '', color: 0.7 })
   const [scores, setScores] = useState({ nose: 20, palate: 20, finish: 20, balance: 20 })
-  const [notes, setNotes] = useState({ nose: '', palate: '', finish: '' })
-  const [flavors, setFlavors] = useState<{ nose: FlavorWithStrength[]; palate: FlavorWithStrength[]; finish: FlavorWithStrength[] }>({ 
-    nose: [], palate: [], finish: [] 
-  })
+  const [notes, setNotes] = useState({ nose: '', palate: '', finish: '', overall: '' })
+  const [flavors, setFlavors] = useState<{ nose: FlavorWithStrength[]; palate: FlavorWithStrength[]; finish: FlavorWithStrength[] }>({ nose: [], palate: [], finish: [] })
+  const [wouldRebuy, setWouldRebuy] = useState<'yes' | 'no' | 'maybe' | undefined>()
   const [exporting, setExporting] = useState(false)
   const [correcting, setCorrecting] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -77,10 +93,15 @@ export default function EditReviewPage() {
         abv: review.whisky.abv || '',
         cask: review.whisky.cask || '',
         color: review.whisky.color || 0.7,
+        bottlingType: review.whisky.bottlingType,
+        bottleNumber: review.whisky.bottleNumber,
+        price: review.whisky.price,
+        purchaseDate: review.whisky.purchaseDate,
+        openingDate: review.whisky.openingDate,
       })
       setScores(review.scores)
-      setNotes(review.notes)
-      // Handle old format (string[]) vs new format (FlavorWithStrength[])
+      setNotes({ ...review.notes, overall: review.notes.overall || '' })
+      setWouldRebuy(review.wouldRebuy)
       const convertFlavors = (f: any[]): FlavorWithStrength[] => {
         if (!f || f.length === 0) return []
         if (typeof f[0] === 'string') return f.map(id => ({ id, strength: 3 }))
@@ -101,38 +122,35 @@ export default function EditReviewPage() {
     localStorage.setItem('wmg-lang', newLang)
   }
 
-  const handleCorrect = async (key: 'nose' | 'palate' | 'finish') => {
-    if (!notes[key].trim() || correcting) return
+  const handleCorrect = async (key: 'nose' | 'palate' | 'finish' | 'overall') => {
+    const text = key === 'overall' ? notes.overall : notes[key]
+    if (!text?.trim() || correcting) return
     setCorrecting(key)
     try {
-      const corrected = await correctText(notes[key], lang)
+      const corrected = await correctText(text, lang)
       setNotes(n => ({ ...n, [key]: corrected }))
-    } finally {
-      setCorrecting(null)
-    }
+    } finally { setCorrecting(null) }
   }
 
   const total = scores.nose + scores.palate + scores.finish + scores.balance
-  const colorInfo = whiskyColors.find(c => c.value === whisky.color)
 
   const handleExportPNG = async () => {
     if (!cardRef.current || exporting) return
     setExporting(true)
     try {
-      const dataUrl = await domToPng(cardRef.current, { scale: 2, backgroundColor: '#fffbeb' })
+      const dataUrl = await domToPng(cardRef.current, { scale: 2, backgroundColor: '#ffffff' })
       const link = document.createElement('a')
       link.href = dataUrl
       link.download = `${whisky.name || 'review'}.png`
       link.click()
-    } catch (e) { console.warn(e) } 
-    finally { setExporting(false) }
+    } finally { setExporting(false) }
   }
 
   const handleExportPDF = async () => {
     if (!cardRef.current || exporting) return
     setExporting(true)
     try {
-      const dataUrl = await domToPng(cardRef.current, { scale: 2, backgroundColor: '#fffbeb' })
+      const dataUrl = await domToPng(cardRef.current, { scale: 2, backgroundColor: '#ffffff' })
       const img = new window.Image()
       img.src = dataUrl
       await new Promise(resolve => { img.onload = resolve })
@@ -141,21 +159,17 @@ export default function EditReviewPage() {
       const h = (img.height * w) / img.width
       pdf.addImage(dataUrl, 'PNG', 10, 10, w, h)
       pdf.save(`${whisky.name || 'review'}.pdf`)
-    } catch (e) { console.warn(e) } 
-    finally { setExporting(false) }
+    } finally { setExporting(false) }
   }
 
   const handleSave = () => {
-    storage.updateReview(params.id as string, { reviewer, whisky, scores, notes, flavors })
+    storage.updateReview(params.id as string, { reviewer, whisky, scores, notes, flavors, wouldRebuy })
     alert(ui.saved[lang])
     router.push('/')
   }
 
-  if (!loaded) {
-    return <div className="p-4 text-center text-gray-500">Loading...</div>
-  }
+  if (!loaded) return <div className="p-4 text-center text-gray-500">Loading...</div>
 
-  // Preview Card
   if (step === 'preview') {
     return (
       <div className="max-w-2xl mx-auto p-4">
@@ -168,81 +182,20 @@ export default function EditReviewPage() {
           </button>
         </div>
 
-        <div ref={cardRef} style={{ backgroundColor: '#fffbeb', borderRadius: '12px', border: '1px solid #fcd34d', overflow: 'hidden' }}>
-          <div style={{ backgroundColor: '#fef3c7', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #fcd34d' }}>
-            <span style={{ fontSize: '20px' }}>🥃</span>
-            <span style={{ fontSize: '14px', color: '#b45309' }}>📅 {new Date().toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US')}</span>
-          </div>
-          <div style={{ backgroundColor: '#fef9e7', padding: '12px 16px', borderBottom: '1px solid #fcd34d' }}>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <div style={{ width: '48px', height: '64px', borderRadius: '8px', border: '2px solid #fcd34d', flexShrink: 0, backgroundColor: colorInfo?.hex }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <p style={{ fontWeight: 'bold', color: '#111827', margin: 0 }}>
-                      {whisky.country && <span style={{ marginRight: '4px' }}>{getCountryFlag(whisky.country)}</span>}
-                      {whisky.name}
-                    </p>
-                    <p style={{ fontSize: '14px', color: '#4b5563', margin: '2px 0' }}>{whisky.distillery}</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                      {whisky.age && <span>{whisky.age}{lang === 'ko' ? '년' : 'Y'}</span>}
-                      {whisky.abv && <span>{whisky.abv}%</span>}
-                      {whisky.cask && <span>{whisky.cask}</span>}
-                      <span>{colorInfo?.name[lang]}</span>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#b45309' }}>{total}</div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>/100</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid #fcd34d', backgroundColor: '#ffffff' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', textAlign: 'center' }}>
-              {(['nose', 'palate', 'finish', 'balance'] as const).map(key => (
-                <div key={key}>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#d97706' }}>{scores[key]}</div>
-                  <div style={{ fontSize: '10px', color: '#6b7280' }}>{labels[key][lang]}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          {(['nose', 'palate', 'finish'] as const).map(key => (
-            (flavors[key].length > 0 || notes[key]) && (
-              <div key={key} style={{ padding: '16px', borderBottom: '1px solid #fcd34d', backgroundColor: '#ffffff' }}>
-                <h3 style={{ fontWeight: 'bold', color: '#1f2937', margin: '0 0 8px 0' }}>{labels[key][lang]}</h3>
-                <div style={{ display: 'flex', gap: '16px' }}>
-                  {flavors[key].length > 0 && <div style={{ flexShrink: 0 }}><FlavorRadar flavors={flavors[key]} lang={lang} size={130} /></div>}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {flavors[key].length > 0 && <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{flavors[key].map(f => getTagName(f.id, lang)).join(' / ')}</p>}
-                    {notes[key] && <p style={{ fontSize: '14px', color: '#374151', whiteSpace: 'pre-wrap', margin: 0 }}>{notes[key]}</p>}
-                  </div>
-                </div>
-              </div>
-            )
-          ))}
-          {reviewer && <div style={{ padding: '12px 16px', backgroundColor: '#fef9e7', fontSize: '12px', color: '#6b7280' }}>by {reviewer}</div>}
+        <div ref={cardRef}>
+          <ExportCard whisky={whisky} scores={scores} notes={notes} flavors={flavors} reviewer={reviewer} wouldRebuy={wouldRebuy}
+            date={new Date().toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US')} lang={lang} />
         </div>
 
-        <div style={{ marginTop: '16px' }} />
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <button onClick={handleExportPNG} disabled={exporting} className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50">
-            <Image size={18} /> PNG
-          </button>
-          <button onClick={handleExportPDF} disabled={exporting} className="flex items-center justify-center gap-2 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50">
-            <FileText size={18} /> PDF
-          </button>
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <button onClick={handleExportPNG} disabled={exporting} className="py-3 bg-blue-600 text-white rounded-xl disabled:opacity-50">PNG</button>
+          <button onClick={handleExportPDF} disabled={exporting} className="py-3 bg-red-600 text-white rounded-xl disabled:opacity-50">PDF</button>
         </div>
-        <button onClick={handleSave} className="w-full py-3 bg-amber-600 text-white rounded-xl hover:bg-amber-700">
-          <Download size={18} className="inline mr-2" /> {ui.save[lang]}
-        </button>
+        <button onClick={handleSave} className="w-full mt-3 py-3 bg-amber-600 text-white rounded-xl">{ui.save[lang]}</button>
       </div>
     )
   }
 
-  // Form
   return (
     <div className="max-w-2xl mx-auto p-4 pb-8">
       <div className="flex items-center justify-between mb-6">
@@ -257,25 +210,53 @@ export default function EditReviewPage() {
 
       <section className="mb-5">
         <label className="block text-sm font-medium text-gray-700 mb-2">{ui.reviewer[lang]}</label>
-        <input type="text" placeholder={ui.reviewerPlaceholder[lang]} value={reviewer} onChange={e => setReviewer(e.target.value)} className="w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500" />
+        <input type="text" value={reviewer} onChange={e => setReviewer(e.target.value)} className="w-full px-3 py-2.5 border rounded-lg" />
       </section>
 
       <section className="mb-5">
         <label className="block text-sm font-medium text-gray-700 mb-2">{ui.whiskyInfo[lang]}</label>
         <div className="space-y-2">
-          <input type="text" placeholder={ui.whiskyName[lang] + ' *'} value={whisky.name} onChange={e => setWhisky(w => ({ ...w, name: e.target.value }))} className="w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500" />
+          <input type="text" placeholder={ui.whiskyName[lang] + ' *'} value={whisky.name} onChange={e => setWhisky(w => ({ ...w, name: e.target.value }))} className="w-full px-3 py-2.5 border rounded-lg" />
           <div className="grid grid-cols-2 gap-2">
-            <input type="text" placeholder={ui.distillery[lang]} value={whisky.distillery} onChange={e => setWhisky(w => ({ ...w, distillery: e.target.value }))} className="px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500" />
-            <select value={whisky.country} onChange={e => setWhisky(w => ({ ...w, country: e.target.value }))} className="px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500 bg-white">
+            <input type="text" placeholder={ui.distillery[lang]} value={whisky.distillery} onChange={e => setWhisky(w => ({ ...w, distillery: e.target.value }))} className="px-3 py-2.5 border rounded-lg" />
+            <select value={whisky.country} onChange={e => setWhisky(w => ({ ...w, country: e.target.value }))} className="px-3 py-2.5 border rounded-lg bg-white">
               <option value="">{ui.selectCountry[lang]}</option>
               {countries.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name[lang]}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input type="text" placeholder={ui.age[lang]} value={whisky.age} onChange={e => setWhisky(w => ({ ...w, age: e.target.value }))} className="px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500" />
-            <input type="text" placeholder={ui.abv[lang]} value={whisky.abv} onChange={e => setWhisky(w => ({ ...w, abv: e.target.value }))} className="px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500" />
+          <div className="grid grid-cols-3 gap-2">
+            <input type="text" placeholder={ui.age[lang]} value={whisky.age} onChange={e => setWhisky(w => ({ ...w, age: e.target.value }))} className="px-3 py-2.5 border rounded-lg" />
+            <input type="text" placeholder={ui.abv[lang]} value={whisky.abv} onChange={e => setWhisky(w => ({ ...w, abv: e.target.value }))} className="px-3 py-2.5 border rounded-lg" />
+            <input type="text" placeholder={ui.cask[lang]} value={whisky.cask} onChange={e => setWhisky(w => ({ ...w, cask: e.target.value }))} className="px-3 py-2.5 border rounded-lg" />
           </div>
-          <input type="text" placeholder={ui.cask[lang] + ' (ex: Sherry, Bourbon, Port...)'} value={whisky.cask} onChange={e => setWhisky(w => ({ ...w, cask: e.target.value }))} className="w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500" />
+        </div>
+      </section>
+
+      <section className="mb-5 p-3 bg-gray-50 rounded-lg border border-dashed">
+        <label className="block text-xs font-medium text-gray-500 mb-2">{ui.optional[lang]}</label>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            {(['official', 'ib', 'single_cask'] as const).map(t => (
+              <button key={t} onClick={() => setWhisky(w => ({ ...w, bottlingType: w.bottlingType === t ? undefined : t }))}
+                className={`flex-1 py-2 text-xs rounded-lg border ${whisky.bottlingType === t ? 'bg-amber-100 border-amber-400 text-amber-700' : 'bg-white'}`}>
+                {ui[t === 'single_cask' ? 'singleCask' : t][lang]}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input type="text" placeholder={ui.bottleNumber[lang]} value={whisky.bottleNumber || ''} onChange={e => setWhisky(w => ({ ...w, bottleNumber: e.target.value }))} className="px-3 py-2 text-sm border rounded-lg" />
+            <input type="text" placeholder={ui.price[lang]} value={whisky.price || ''} onChange={e => setWhisky(w => ({ ...w, price: e.target.value }))} className="px-3 py-2 text-sm border rounded-lg" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-gray-500">{ui.purchaseDate[lang]}</label>
+              <input type="date" value={whisky.purchaseDate || ''} onChange={e => setWhisky(w => ({ ...w, purchaseDate: e.target.value }))} className="w-full px-3 py-2 text-sm border rounded-lg" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">{ui.openingDate[lang]}</label>
+              <input type="date" value={whisky.openingDate || ''} onChange={e => setWhisky(w => ({ ...w, openingDate: e.target.value }))} className="w-full px-3 py-2 text-sm border rounded-lg" />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -307,9 +288,9 @@ export default function EditReviewPage() {
           <label className="block text-sm font-medium text-gray-700 mb-2">{i === 0 ? '👃' : i === 1 ? '👅' : '✨'} {labels[key][lang]}</label>
           <FlavorWheel categories={flavorData} selected={flavors[key]} onSelect={f => setFlavors(prev => ({ ...prev, [key]: f }))} maxSelect={10} lang={lang} />
           <div className="relative mt-2">
-            <textarea placeholder={ui[`${key}Note` as keyof typeof ui][lang]} value={notes[key]} onChange={e => setNotes(n => ({ ...n, [key]: e.target.value }))} rows={2} className="w-full px-3 py-2 pr-20 border rounded-lg focus:ring-2 focus:ring-amber-500 resize-none text-sm" />
+            <textarea placeholder={ui[`${key}Note` as keyof typeof ui][lang]} value={notes[key]} onChange={e => setNotes(n => ({ ...n, [key]: e.target.value }))} rows={2} className="w-full px-3 py-2 pr-20 border rounded-lg resize-none text-sm" />
             {notes[key].trim() && (
-              <button onClick={() => handleCorrect(key)} disabled={correcting === key} className="absolute right-2 top-2 flex items-center gap-1 px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50">
+              <button onClick={() => handleCorrect(key)} disabled={correcting === key} className="absolute right-2 top-2 flex items-center gap-1 px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded disabled:opacity-50">
                 <Sparkles size={12} />{correcting === key ? ui.correcting[lang] : ui.aiCorrect[lang]}
               </button>
             )}
@@ -317,7 +298,30 @@ export default function EditReviewPage() {
         </section>
       ))}
 
-      <button onClick={() => setStep('preview')} disabled={!whisky.name} className="w-full py-3 bg-amber-600 text-white font-semibold rounded-xl hover:bg-amber-700 disabled:opacity-50">
+      <section className="mb-5 p-3 rounded-lg border bg-gray-50">
+        <label className="block text-sm font-medium text-gray-700 mb-2">📝 {ui.overall[lang]}</label>
+        <div className="relative">
+          <textarea placeholder={ui.overallNote[lang]} value={notes.overall || ''} onChange={e => setNotes(n => ({ ...n, overall: e.target.value }))} rows={3} className="w-full px-3 py-2 pr-20 border rounded-lg resize-none text-sm" />
+          {notes.overall?.trim() && (
+            <button onClick={() => handleCorrect('overall')} disabled={correcting === 'overall'} className="absolute right-2 top-2 flex items-center gap-1 px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded disabled:opacity-50">
+              <Sparkles size={12} />{correcting === 'overall' ? ui.correcting[lang] : ui.aiCorrect[lang]}
+            </button>
+          )}
+        </div>
+        <div className="mt-3">
+          <label className="text-xs text-gray-500 mb-1 block">{ui.wouldRebuy[lang]}</label>
+          <div className="flex gap-2">
+            {(['yes', 'no', 'maybe'] as const).map(v => (
+              <button key={v} onClick={() => setWouldRebuy(wouldRebuy === v ? undefined : v)}
+                className={`flex-1 py-2 text-sm rounded-lg border ${wouldRebuy === v ? 'bg-amber-100 border-amber-400 text-amber-700' : 'bg-white'}`}>
+                {v === 'yes' ? '👍' : v === 'no' ? '👎' : '🤔'} {ui[v][lang]}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <button onClick={() => setStep('preview')} disabled={!whisky.name} className="w-full py-3 bg-amber-600 text-white font-semibold rounded-xl disabled:opacity-50">
         {ui.preview[lang]} →
       </button>
     </div>
