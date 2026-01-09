@@ -13,6 +13,7 @@ export type Review = {
     country?: string
     age?: string
     abv?: string
+    cask?: string
     color?: number
   }
   scores: { nose: number; palate: number; finish: number; balance: number }

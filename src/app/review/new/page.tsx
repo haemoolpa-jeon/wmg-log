@@ -29,6 +29,7 @@ const ui = {
   selectCountry: { ko: '국가 선택', en: 'Select Country' },
   age: { ko: '숙성 연수', en: 'Age' },
   abv: { ko: '도수 (%)', en: 'ABV (%)' },
+  cask: { ko: '캐스크', en: 'Cask' },
   color: { ko: '색상', en: 'Color' },
   score: { ko: '점수', en: 'Score' },
   rating: { ko: '평점', en: 'Rating' },
@@ -48,7 +49,7 @@ export default function NewReviewPage() {
   const [lang, setLang] = useState<Lang>('ko')
   const [step, setStep] = useState<'form' | 'preview'>('form')
   const [reviewer, setReviewer] = useState('')
-  const [whisky, setWhisky] = useState({ name: '', distillery: '', country: '', age: '', abv: '', color: 0.7 })
+  const [whisky, setWhisky] = useState({ name: '', distillery: '', country: '', age: '', abv: '', cask: '', color: 0.7 })
   const [scores, setScores] = useState({ nose: 20, palate: 20, finish: 20, balance: 20 })
   const [notes, setNotes] = useState({ nose: '', palate: '', finish: '' })
   const [flavors, setFlavors] = useState<{ nose: FlavorWithStrength[]; palate: FlavorWithStrength[]; finish: FlavorWithStrength[] }>({ 
@@ -115,7 +116,7 @@ export default function NewReviewPage() {
   }
 
   const reset = () => {
-    setWhisky({ name: '', distillery: '', country: '', age: '', abv: '', color: 0.7 })
+    setWhisky({ name: '', distillery: '', country: '', age: '', abv: '', cask: '', color: 0.7 })
     setScores({ nose: 20, palate: 20, finish: 20, balance: 20 })
     setNotes({ nose: '', palate: '', finish: '' })
     setFlavors({ nose: [], palate: [], finish: [] })
@@ -165,9 +166,10 @@ export default function NewReviewPage() {
                       {whisky.name}
                     </p>
                     <p className="text-sm text-gray-600">{whisky.distillery}</p>
-                    <div className="flex gap-3 text-xs text-gray-500 mt-1">
+                    <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
                       {whisky.age && <span>{whisky.age}{lang === 'ko' ? '년' : 'Y'}</span>}
                       {whisky.abv && <span>{whisky.abv}%</span>}
+                      {whisky.cask && <span>{whisky.cask}</span>}
                       <span>{colorInfo?.name[lang]}</span>
                     </div>
                   </div>
@@ -307,6 +309,13 @@ export default function NewReviewPage() {
               className="px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500"
             />
           </div>
+          <input
+            type="text"
+            placeholder={ui.cask[lang] + ' (ex: Sherry, Bourbon, Port...)'}
+            value={whisky.cask}
+            onChange={e => setWhisky(w => ({ ...w, cask: e.target.value }))}
+            className="w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500"
+          />
         </div>
       </section>
 
