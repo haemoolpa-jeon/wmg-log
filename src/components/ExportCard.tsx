@@ -3,7 +3,6 @@
 import { forwardRef } from 'react'
 import { FlavorRadar } from './FlavorRadar'
 import { getTagName, whiskyColors, Lang } from '@/lib/flavors'
-import { getCountryFlag } from '@/lib/countries'
 import { FlavorWithStrength } from '@/lib/storage'
 
 type Props = {
@@ -38,7 +37,7 @@ export const ExportCard = forwardRef<HTMLDivElement, Props>(({ whisky, scores, n
   // All styles inline to avoid Tailwind's lab() colors
   const styles = {
     card: { backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e5e7eb', overflow: 'hidden', fontFamily: 'system-ui, sans-serif', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
-    header: { backgroundColor: '#f8f4e8', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb' },
+    header: { backgroundColor: '#f8f4e8', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', borderBottom: '1px solid #e5e7eb' },
     infoSection: { backgroundColor: '#fefcf6', padding: '16px 20px', borderBottom: '1px solid #e5e7eb' },
     colorBox: { width: '52px', height: '68px', borderRadius: '10px', border: '3px solid #ffffff', flexShrink: 0, backgroundColor: colorInfo?.hex || '#FFB300', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
     scoreSection: { padding: '14px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#ffffff' },
@@ -50,7 +49,6 @@ export const ExportCard = forwardRef<HTMLDivElement, Props>(({ whisky, scores, n
     <div ref={ref} style={styles.card}>
       {/* Header */}
       <div style={styles.header}>
-        <span style={{ fontSize: '22px' }}>🥃</span>
         <span style={{ fontSize: '13px', color: '#92400e', fontWeight: '500' }}>📅 {date}</span>
       </div>
 
@@ -62,7 +60,7 @@ export const ExportCard = forwardRef<HTMLDivElement, Props>(({ whisky, scores, n
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <p style={{ fontWeight: '600', color: '#1f2937', margin: 0, fontSize: '17px' }}>
-                  {whisky.country && <span style={{ marginRight: '6px' }}>{getCountryFlag(whisky.country)}</span>}
+                  {whisky.country && <span style={{ marginRight: '6px', fontSize: '12px', backgroundColor: '#f3f4f6', padding: '2px 6px', borderRadius: '4px', color: '#6b7280' }}>{whisky.country}</span>}
                   {whisky.name}
                 </p>
                 <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0' }}>{whisky.distillery}</p>
