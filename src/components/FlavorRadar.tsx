@@ -54,7 +54,7 @@ export function FlavorRadar({ flavors, lang, size = 140 }: Props) {
 
       {/* Data points */}
       {points.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r="4" fill="#ef4444" />
+        <circle key={i} cx={p.x} cy={p.y} r="2" fill="#ef4444" />
       ))}
 
       {/* Labels */}
@@ -67,7 +67,7 @@ export function FlavorRadar({ flavors, lang, size = 140 }: Props) {
             y={labelPoint.y}
             textAnchor="middle"
             dominantBaseline="middle"
-            className="text-[7px] fill-gray-600"
+            style={{ fontSize: '8px', fill: '#6b7280' }}
           >
             {getTagName(f.id, lang)}
           </text>
