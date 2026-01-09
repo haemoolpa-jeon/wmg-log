@@ -28,24 +28,26 @@ export const getCountryFlag = (code: string): string => {
 
 // LanguageTool free API for text correction
 export async function correctText(text: string, lang: Lang): Promise<string> {
-  if (!text.trim() || text.length < 3) return text
+  if (!text.trim() || text.length < 5) return text
   
   try {
+    // LanguageTool uses 'auto' for auto-detect, or specific codes
+    // Korean is not well supported, so use auto-detect
+    const langCode = lang === 'ko' ? 'auto' : 'en-US'
+    
     const params = new URLSearchParams()
     params.append('text', text)
-    params.append('language', lang === 'ko' ? 'ko' : 'en-US')
+    params.append('language', langCode)
     
     const response = await fetch('https://api.languagetool.org/v2/check', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
       },
       body: params.toString(),
     })
     
     if (!response.ok) {
-      console.error('LanguageTool API error:', response.status)
       return text
     }
     
@@ -65,8 +67,7 @@ export async function correctText(text: string, lang: Lang): Promise<string> {
     }
     
     return corrected
-  } catch (err) {
-    console.error('Text correction error:', err)
+  } catch {
     return text
   }
 }
