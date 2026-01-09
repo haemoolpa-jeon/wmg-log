@@ -21,6 +21,8 @@ const labels = {
 const ui = {
   writeReview: { ko: '리뷰 작성', en: 'Write Review' },
   whiskyInfo: { ko: '위스키 정보', en: 'Whisky Info' },
+  reviewer: { ko: '리뷰어', en: 'Reviewer' },
+  reviewerPlaceholder: { ko: '이름 또는 닉네임', en: 'Name or nickname' },
   whiskyName: { ko: '위스키 이름', en: 'Whisky Name' },
   distillery: { ko: '증류소', en: 'Distillery' },
   country: { ko: '국가', en: 'Country' },
@@ -45,6 +47,7 @@ const ui = {
 export default function NewReviewPage() {
   const [lang, setLang] = useState<Lang>('ko')
   const [step, setStep] = useState<'form' | 'preview'>('form')
+  const [reviewer, setReviewer] = useState('')
   const [whisky, setWhisky] = useState({ name: '', distillery: '', country: '', age: '', abv: '', color: 0.7 })
   const [scores, setScores] = useState({ nose: 20, palate: 20, finish: 20, balance: 20 })
   const [notes, setNotes] = useState({ nose: '', palate: '', finish: '' })
@@ -56,8 +59,10 @@ export default function NewReviewPage() {
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const saved = localStorage.getItem('wmg-lang') as Lang
-    if (saved) setLang(saved)
+    const savedLang = localStorage.getItem('wmg-lang') as Lang
+    if (savedLang) setLang(savedLang)
+    const savedReviewer = localStorage.getItem('wmg-reviewer')
+    if (savedReviewer) setReviewer(savedReviewer)
   }, [])
 
   const toggleLang = () => {
@@ -105,7 +110,7 @@ export default function NewReviewPage() {
   }
 
   const handleSave = () => {
-    storage.saveReview({ whisky, scores, notes, flavors })
+    storage.saveReview({ reviewer, whisky, scores, notes, flavors })
     alert(ui.saved[lang])
   }
 
@@ -145,59 +150,77 @@ export default function NewReviewPage() {
             <div className="text-sm text-amber-700">📅 {new Date().toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US')}</div>
           </div>
 
+          {/* Whisky Info with Color */}
           <div className="bg-amber-100/50 px-4 py-3 border-b border-amber-200">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-gray-500 text-xs">
-                  <th className="text-left font-normal">Whiskey</th>
-                  <th className="text-center font-normal">ABV</th>
-                  <th className="text-right font-normal">{ui.rating[lang]}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="font-semibold">
-                  <td className="text-left">
-                    {whisky.country && <span className="mr-1">{getCountryFlag(whisky.country)}</span>}
-                    {whisky.distillery && <span className="text-gray-500 font-normal">{whisky.distillery} </span>}
-                    {whisky.name} {whisky.age && `${whisky.age}${lang === 'ko' ? '년' : 'Y'}`}
-                  </td>
-                  <td className="text-center">{whisky.abv || '-'}%</td>
-                  <td className="text-right text-amber-700">{total}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {(['nose', 'palate', 'finish'] as const).map(key => (
-            <div key={key} className="px-4 py-4 border-b border-amber-200 bg-white">
-              <div className="flex items-start justify-between mb-3">
-                <h3 className="font-bold text-gray-800">{labels[key][lang]}</h3>
-                <div className="flex items-center gap-1 text-amber-600">
-                  <span className="text-lg">✓</span>
-                  <span className="font-bold">{scores[key]}</span>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                {flavors[key].length > 0 && (
-                  <div className="flex-shrink-0">
-                    <FlavorRadar flavors={flavors[key]} lang={lang} size={130} />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  {flavors[key].length > 0 && (
-                    <p className="text-xs text-gray-500 mb-2">
-                      {flavors[key].map(f => getTagName(f.id, lang)).join(' / ')}
+            <div className="flex gap-3">
+              <div 
+                className="w-12 h-16 rounded-lg border-2 border-amber-300 flex-shrink-0"
+                style={{ backgroundColor: colorInfo?.hex }}
+              />
+              <div className="flex-1">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-bold text-gray-900">
+                      {whisky.country && <span className="mr-1">{getCountryFlag(whisky.country)}</span>}
+                      {whisky.name}
                     </p>
-                  )}
-                  {notes[key] && <p className="text-sm text-gray-700 whitespace-pre-wrap">{notes[key]}</p>}
+                    <p className="text-sm text-gray-600">{whisky.distillery}</p>
+                    <div className="flex gap-3 text-xs text-gray-500 mt-1">
+                      {whisky.age && <span>{whisky.age}{lang === 'ko' ? '년' : 'Y'}</span>}
+                      {whisky.abv && <span>{whisky.abv}%</span>}
+                      <span>{colorInfo?.name[lang]}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-amber-700">{total}</div>
+                    <div className="text-xs text-gray-500">/100</div>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Scores */}
+          <div className="px-4 py-3 border-b border-amber-200 bg-white">
+            <div className="grid grid-cols-4 gap-2 text-center">
+              {(['nose', 'palate', 'finish', 'balance'] as const).map(key => (
+                <div key={key}>
+                  <div className="text-lg font-bold text-amber-600">{scores[key]}</div>
+                  <div className="text-[10px] text-gray-500">{labels[key][lang]}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {(['nose', 'palate', 'finish'] as const).map(key => (
+            (flavors[key].length > 0 || notes[key]) && (
+              <div key={key} className="px-4 py-4 border-b border-amber-200 bg-white">
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="font-bold text-gray-800">{labels[key][lang]}</h3>
+                </div>
+                <div className="flex gap-4">
+                  {flavors[key].length > 0 && (
+                    <div className="flex-shrink-0">
+                      <FlavorRadar flavors={flavors[key]} lang={lang} size={130} />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    {flavors[key].length > 0 && (
+                      <p className="text-xs text-gray-500 mb-2">
+                        {flavors[key].map(f => getTagName(f.id, lang)).join(' / ')}
+                      </p>
+                    )}
+                    {notes[key] && <p className="text-sm text-gray-700 whitespace-pre-wrap">{notes[key]}</p>}
+                  </div>
+                </div>
+              </div>
+            )
           ))}
 
-          <div className="px-4 py-3 bg-white flex items-center gap-3">
-            <div className="w-8 h-8 rounded border" style={{ backgroundColor: colorInfo?.hex }} />
-            <span className="text-sm text-gray-600">{colorInfo?.name[lang]}</span>
+          {/* Footer with reviewer */}
+          <div className="px-4 py-3 bg-amber-100/50 flex items-center justify-between text-xs text-gray-500">
+            {reviewer && <span>by {reviewer}</span>}
+            <span className="ml-auto">WmG Review</span>
           </div>
         </div>
 
@@ -225,6 +248,18 @@ export default function NewReviewPage() {
           <Globe size={14} /> {lang === 'ko' ? 'EN' : '한국어'}
         </button>
       </div>
+
+      {/* Reviewer */}
+      <section className="mb-5">
+        <label className="block text-sm font-medium text-gray-700 mb-2">{ui.reviewer[lang]}</label>
+        <input
+          type="text"
+          placeholder={ui.reviewerPlaceholder[lang]}
+          value={reviewer}
+          onChange={e => setReviewer(e.target.value)}
+          className="w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500"
+        />
+      </section>
 
       {/* Whisky Info */}
       <section className="mb-5">

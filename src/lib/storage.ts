@@ -6,6 +6,7 @@ export type FlavorWithStrength = {
 export type Review = {
   id: string
   createdAt: string
+  reviewer?: string
   whisky: {
     name: string
     distillery: string
@@ -41,6 +42,10 @@ export const storage = {
     }
     reviews.unshift(newReview)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews))
+    // Save reviewer name for next time
+    if (review.reviewer) {
+      localStorage.setItem('wmg-reviewer', review.reviewer)
+    }
     return newReview
   },
 
