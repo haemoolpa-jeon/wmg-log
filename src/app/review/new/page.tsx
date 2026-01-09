@@ -1,208 +1,355 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { FlavorSelector } from '@/components/FlavorSelector'
-import { ChevronLeft, Search } from 'lucide-react'
-import Link from 'next/link'
+import { useState, useRef, useEffect } from 'react'
+import { FlavorWheel } from '@/components/FlavorWheel'
+import { ColorPicker } from '@/components/ColorPicker'
+import { FlavorRadar } from '@/components/FlavorRadar'
+import { flavorData, getTagName, whiskyColors, Lang } from '@/lib/flavors'
+import { countries, getCountryFlag, correctText } from '@/lib/countries'
+import { storage, FlavorWithStrength } from '@/lib/storage'
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
+import { Download, Image, FileText, ChevronLeft, RotateCcw, Globe, Sparkles } from 'lucide-react'
 
-type Whisky = { id: string; name: string; name_kr: string | null; distillery: string | null }
-type FlavorTag = { id: string; name: string; name_kr: string; category: string; color: string }
+const labels = {
+  nose: { ko: '노즈', en: 'Nose' },
+  palate: { ko: '팔레트', en: 'Palate' },
+  finish: { ko: '피니시', en: 'Finish' },
+  balance: { ko: '밸런스', en: 'Balance' },
+}
 
-const scoreCategories = [
-  { key: 'nose', label: 'Nose', label_kr: '향 (노즈)' },
-  { key: 'palate', label: 'Palate', label_kr: '맛 (팔레트)' },
-  { key: 'finish', label: 'Finish', label_kr: '피니시' },
-  { key: 'balance', label: 'Balance', label_kr: '밸런스' },
-]
+const ui = {
+  writeReview: { ko: '리뷰 작성', en: 'Write Review' },
+  whiskyInfo: { ko: '위스키 정보', en: 'Whisky Info' },
+  whiskyName: { ko: '위스키 이름', en: 'Whisky Name' },
+  distillery: { ko: '증류소', en: 'Distillery' },
+  country: { ko: '국가', en: 'Country' },
+  selectCountry: { ko: '국가 선택', en: 'Select Country' },
+  age: { ko: '숙성 연수', en: 'Age' },
+  abv: { ko: '도수 (%)', en: 'ABV (%)' },
+  color: { ko: '색상', en: 'Color' },
+  score: { ko: '점수', en: 'Score' },
+  rating: { ko: '평점', en: 'Rating' },
+  preview: { ko: '미리보기', en: 'Preview' },
+  edit: { ko: '수정', en: 'Edit' },
+  newReview: { ko: '새로 작성', en: 'New' },
+  saveLocal: { ko: '로컬에 저장', en: 'Save' },
+  saved: { ko: '저장되었습니다!', en: 'Saved!' },
+  noseNote: { ko: '향에 대한 노트...', en: 'Aroma notes...' },
+  palateNote: { ko: '맛에 대한 노트...', en: 'Taste notes...' },
+  finishNote: { ko: '여운에 대한 노트...', en: 'Finish notes...' },
+  aiCorrect: { ko: 'AI 교정', en: 'AI Fix' },
+  correcting: { ko: '교정 중...', en: 'Fixing...' },
+}
 
 export default function NewReviewPage() {
-  const [whiskySearch, setWhiskySearch] = useState('')
-  const [whiskies, setWhiskies] = useState<Whisky[]>([])
-  const [selectedWhisky, setSelectedWhisky] = useState<Whisky | null>(null)
+  const [lang, setLang] = useState<Lang>('ko')
+  const [step, setStep] = useState<'form' | 'preview'>('form')
+  const [whisky, setWhisky] = useState({ name: '', distillery: '', country: '', age: '', abv: '', color: 0.7 })
   const [scores, setScores] = useState({ nose: 20, palate: 20, finish: 20, balance: 20 })
   const [notes, setNotes] = useState({ nose: '', palate: '', finish: '' })
-  const [flavorTags, setFlavorTags] = useState<FlavorTag[]>([])
-  const [selectedFlavors, setSelectedFlavors] = useState<string[]>([])
-  const [saving, setSaving] = useState(false)
-
-  const supabase = createClient()
-  const totalScore = scores.nose + scores.palate + scores.finish + scores.balance
+  const [flavors, setFlavors] = useState<{ nose: FlavorWithStrength[]; palate: FlavorWithStrength[]; finish: FlavorWithStrength[] }>({ 
+    nose: [], palate: [], finish: [] 
+  })
+  const [exporting, setExporting] = useState(false)
+  const [correcting, setCorrecting] = useState<string | null>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    supabase.from('flavor_tags').select('*').then(({ data }) => {
-      if (data) setFlavorTags(data)
-    })
+    const saved = localStorage.getItem('wmg-lang') as Lang
+    if (saved) setLang(saved)
   }, [])
 
-  useEffect(() => {
-    if (whiskySearch.length < 2) return setWhiskies([])
-    const timer = setTimeout(async () => {
-      const { data } = await supabase
-        .from('whiskies')
-        .select('id, name, name_kr, distillery')
-        .or(`name.ilike.%${whiskySearch}%,name_kr.ilike.%${whiskySearch}%`)
-        .limit(5)
-      setWhiskies(data || [])
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [whiskySearch])
-
-  const handleSubmit = async () => {
-    if (!selectedWhisky) return alert('위스키를 선택해주세요')
-    setSaving(true)
-    
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return alert('로그인이 필요합니다')
-
-    const { data: review, error } = await supabase
-      .from('reviews')
-      .insert({
-        user_id: user.id,
-        whisky_id: selectedWhisky.id,
-        rating: totalScore / 20,
-        nose: notes.nose,
-        palate: notes.palate,
-        finish: notes.finish,
-      })
-      .select()
-      .single()
-
-    if (error || !review) {
-      setSaving(false)
-      return alert('저장 실패: ' + error?.message)
-    }
-
-    if (selectedFlavors.length > 0) {
-      await supabase.from('review_flavors').insert(
-        selectedFlavors.map(fid => ({ review_id: review.id, flavor_tag_id: fid }))
-      )
-    }
-
-    alert('리뷰가 저장되었습니다!')
-    setSaving(false)
+  const toggleLang = () => {
+    const newLang = lang === 'ko' ? 'en' : 'ko'
+    setLang(newLang)
+    localStorage.setItem('wmg-lang', newLang)
   }
 
-  return (
-    <div className="max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/" className="lg:hidden p-2 -ml-2">
-          <ChevronLeft size={24} />
-        </Link>
-        <h1 className="text-xl font-bold">리뷰 작성</h1>
-      </div>
+  const handleCorrect = async (key: 'nose' | 'palate' | 'finish') => {
+    if (!notes[key].trim() || correcting) return
+    setCorrecting(key)
+    try {
+      const corrected = await correctText(notes[key], lang)
+      setNotes(n => ({ ...n, [key]: corrected }))
+    } finally {
+      setCorrecting(null)
+    }
+  }
 
-      {/* Whisky Search */}
-      <section className="mb-8">
-        <label className="block text-sm font-medium text-gray-700 mb-2">위스키 선택</label>
-        {selectedWhisky ? (
-          <div className="flex items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-200">
-            <div>
-              <p className="font-semibold">{selectedWhisky.name}</p>
-              {selectedWhisky.distillery && (
-                <p className="text-sm text-gray-500">{selectedWhisky.distillery}</p>
-              )}
-            </div>
-            <button onClick={() => setSelectedWhisky(null)} className="text-sm text-amber-600">
-              변경
+  const total = scores.nose + scores.palate + scores.finish + scores.balance
+  const colorInfo = whiskyColors.find(c => c.value === whisky.color)
+
+  const handleExportPNG = async () => {
+    if (!cardRef.current) return
+    setExporting(true)
+    const canvas = await html2canvas(cardRef.current, { scale: 2, backgroundColor: '#fff' })
+    const link = document.createElement('a')
+    link.download = `${whisky.name || 'review'}.png`
+    link.href = canvas.toDataURL('image/png')
+    link.click()
+    setExporting(false)
+  }
+
+  const handleExportPDF = async () => {
+    if (!cardRef.current) return
+    setExporting(true)
+    const canvas = await html2canvas(cardRef.current, { scale: 2, backgroundColor: '#fff' })
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const w = pdf.internal.pageSize.getWidth() - 20
+    const h = (canvas.height * w) / canvas.width
+    pdf.addImage(imgData, 'PNG', 10, 10, w, h)
+    pdf.save(`${whisky.name || 'review'}.pdf`)
+    setExporting(false)
+  }
+
+  const handleSave = () => {
+    storage.saveReview({ whisky, scores, notes, flavors })
+    alert(ui.saved[lang])
+  }
+
+  const reset = () => {
+    setWhisky({ name: '', distillery: '', country: '', age: '', abv: '', color: 0.7 })
+    setScores({ nose: 20, palate: 20, finish: 20, balance: 20 })
+    setNotes({ nose: '', palate: '', finish: '' })
+    setFlavors({ nose: [], palate: [], finish: [] })
+    setStep('form')
+  }
+
+  // Preview Card
+  if (step === 'preview') {
+    return (
+      <div className="max-w-2xl mx-auto p-4">
+        <div className="flex items-center justify-between mb-4">
+          <button onClick={() => setStep('form')} className="flex items-center gap-1 text-gray-600">
+            <ChevronLeft size={20} /> {ui.edit[lang]}
+          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={toggleLang} className="flex items-center gap-1 text-gray-500 text-sm border px-2 py-1 rounded">
+              <Globe size={14} /> {lang.toUpperCase()}
+            </button>
+            <button onClick={reset} className="flex items-center gap-1 text-gray-500 text-sm">
+              <RotateCcw size={14} /> {ui.newReview[lang]}
             </button>
           </div>
-        ) : (
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        </div>
+
+        {/* Export Card */}
+        <div ref={cardRef} className="bg-amber-50 rounded-xl border border-amber-200 overflow-hidden mb-4">
+          <div className="bg-amber-100 px-4 py-3 flex items-center justify-between border-b border-amber-200">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🥃</span>
+              <span className="font-bold text-amber-800">WmG</span>
+            </div>
+            <div className="text-sm text-amber-700">📅 {new Date().toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US')}</div>
+          </div>
+
+          <div className="bg-amber-100/50 px-4 py-3 border-b border-amber-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-gray-500 text-xs">
+                  <th className="text-left font-normal">Whiskey</th>
+                  <th className="text-center font-normal">ABV</th>
+                  <th className="text-right font-normal">{ui.rating[lang]}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="font-semibold">
+                  <td className="text-left">
+                    {whisky.country && <span className="mr-1">{getCountryFlag(whisky.country)}</span>}
+                    {whisky.distillery && <span className="text-gray-500 font-normal">{whisky.distillery} </span>}
+                    {whisky.name} {whisky.age && `${whisky.age}${lang === 'ko' ? '년' : 'Y'}`}
+                  </td>
+                  <td className="text-center">{whisky.abv || '-'}%</td>
+                  <td className="text-right text-amber-700">{total}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {(['nose', 'palate', 'finish'] as const).map(key => (
+            <div key={key} className="px-4 py-4 border-b border-amber-200 bg-white">
+              <div className="flex items-start justify-between mb-3">
+                <h3 className="font-bold text-gray-800">{labels[key][lang]}</h3>
+                <div className="flex items-center gap-1 text-amber-600">
+                  <span className="text-lg">✓</span>
+                  <span className="font-bold">{scores[key]}</span>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                {flavors[key].length > 0 && (
+                  <div className="flex-shrink-0">
+                    <FlavorRadar flavors={flavors[key]} lang={lang} size={130} />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  {flavors[key].length > 0 && (
+                    <p className="text-xs text-gray-500 mb-2">
+                      {flavors[key].map(f => getTagName(f.id, lang)).join(' / ')}
+                    </p>
+                  )}
+                  {notes[key] && <p className="text-sm text-gray-700 whitespace-pre-wrap">{notes[key]}</p>}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <div className="px-4 py-3 bg-white flex items-center gap-3">
+            <div className="w-8 h-8 rounded border" style={{ backgroundColor: colorInfo?.hex }} />
+            <span className="text-sm text-gray-600">{colorInfo?.name[lang]}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <button onClick={handleExportPNG} disabled={exporting} className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50">
+            <Image size={18} /> PNG
+          </button>
+          <button onClick={handleExportPDF} disabled={exporting} className="flex items-center justify-center gap-2 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50">
+            <FileText size={18} /> PDF
+          </button>
+        </div>
+        <button onClick={handleSave} className="w-full py-3 bg-amber-600 text-white rounded-xl hover:bg-amber-700">
+          <Download size={18} className="inline mr-2" /> {ui.saveLocal[lang]}
+        </button>
+      </div>
+    )
+  }
+
+  // Form
+  return (
+    <div className="max-w-2xl mx-auto p-4 pb-8">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-bold">{ui.writeReview[lang]}</h1>
+        <button onClick={toggleLang} className="flex items-center gap-1 text-gray-500 text-sm border px-2 py-1 rounded">
+          <Globe size={14} /> {lang === 'ko' ? 'EN' : '한국어'}
+        </button>
+      </div>
+
+      {/* Whisky Info */}
+      <section className="mb-5">
+        <label className="block text-sm font-medium text-gray-700 mb-2">{ui.whiskyInfo[lang]}</label>
+        <div className="space-y-2">
+          <input
+            type="text"
+            placeholder={ui.whiskyName[lang] + ' *'}
+            value={whisky.name}
+            onChange={e => setWhisky(w => ({ ...w, name: e.target.value }))}
+            className="w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500"
+          />
+          <div className="grid grid-cols-2 gap-2">
             <input
               type="text"
-              value={whiskySearch}
-              onChange={e => setWhiskySearch(e.target.value)}
-              placeholder="위스키 이름으로 검색..."
-              className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+              placeholder={ui.distillery[lang]}
+              value={whisky.distillery}
+              onChange={e => setWhisky(w => ({ ...w, distillery: e.target.value }))}
+              className="px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500"
             />
-            {whiskies.length > 0 && (
-              <ul className="absolute w-full mt-1 bg-white border rounded-lg shadow-lg z-10">
-                {whiskies.map(w => (
-                  <li
-                    key={w.id}
-                    onClick={() => { setSelectedWhisky(w); setWhiskySearch(''); setWhiskies([]) }}
-                    className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                  >
-                    <p className="font-medium">{w.name}</p>
-                    {w.distillery && <p className="text-sm text-gray-500">{w.distillery}</p>}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <select
+              value={whisky.country}
+              onChange={e => setWhisky(w => ({ ...w, country: e.target.value }))}
+              className="px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
+            >
+              <option value="">{ui.selectCountry[lang]}</option>
+              {countries.map(c => (
+                <option key={c.code} value={c.code}>{c.flag} {c.name[lang]}</option>
+              ))}
+            </select>
           </div>
-        )}
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder={ui.age[lang]}
+              value={whisky.age}
+              onChange={e => setWhisky(w => ({ ...w, age: e.target.value }))}
+              className="px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500"
+            />
+            <input
+              type="text"
+              placeholder={ui.abv[lang]}
+              value={whisky.abv}
+              onChange={e => setWhisky(w => ({ ...w, abv: e.target.value }))}
+              className="px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
+        </div>
       </section>
 
-      {/* 4x25 Scoring */}
-      <section className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <label className="text-sm font-medium text-gray-700">점수 (4×25 시스템)</label>
-          <span className="text-2xl font-bold text-amber-600">{totalScore}/100</span>
+      {/* Color */}
+      <section className="mb-5">
+        <label className="block text-sm font-medium text-gray-700 mb-2">{ui.color[lang]}</label>
+        <ColorPicker value={whisky.color} onChange={v => setWhisky(w => ({ ...w, color: v }))} lang={lang} />
+      </section>
+
+      {/* Scores */}
+      <section className="mb-5">
+        <div className="flex justify-between items-center mb-2">
+          <label className="text-sm font-medium text-gray-700">{ui.score[lang]}</label>
+          <span className="text-xl font-bold text-amber-600">{total}/100</span>
         </div>
-        <div className="space-y-4">
-          {scoreCategories.map(cat => (
-            <div key={cat.key} className="bg-white p-4 rounded-lg border">
-              <div className="flex justify-between mb-2">
-                <span className="font-medium">{cat.label_kr}</span>
-                <span className="text-amber-600 font-semibold">
-                  {scores[cat.key as keyof typeof scores]}/25
-                </span>
+        <div className="grid grid-cols-2 gap-2">
+          {(['nose', 'palate', 'finish', 'balance'] as const).map(key => (
+            <div key={key} className="bg-white p-3 rounded-lg border">
+              <div className="flex justify-between mb-1">
+                <span className="text-xs font-medium text-gray-600">{labels[key][lang]}</span>
+                <span className="text-amber-600 font-semibold text-sm">{scores[key]}</span>
               </div>
               <input
                 type="range"
                 min={0}
                 max={25}
-                value={scores[cat.key as keyof typeof scores]}
-                onChange={e => setScores(s => ({ ...s, [cat.key]: +e.target.value }))}
-                className="w-full accent-amber-600"
+                value={scores[key]}
+                onChange={e => setScores(s => ({ ...s, [key]: +e.target.value }))}
+                className="w-full accent-amber-600 h-2"
               />
             </div>
           ))}
         </div>
       </section>
 
-      {/* Tasting Notes */}
-      <section className="mb-8">
-        <label className="block text-sm font-medium text-gray-700 mb-4">테이스팅 노트</label>
-        <div className="space-y-4">
-          {(['nose', 'palate', 'finish'] as const).map(key => (
-            <div key={key}>
-              <label className="block text-sm text-gray-600 mb-1">
-                {scoreCategories.find(c => c.key === key)?.label_kr}
-              </label>
-              <textarea
-                value={notes[key]}
-                onChange={e => setNotes(n => ({ ...n, [key]: e.target.value }))}
-                placeholder={`${scoreCategories.find(c => c.key === key)?.label_kr}에서 느껴지는 향과 맛을 적어주세요...`}
-                rows={2}
-                className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-amber-500 resize-none"
-              />
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Tasting sections */}
+      {(['nose', 'palate', 'finish'] as const).map((key, i) => (
+        <section key={key} className={`mb-4 p-3 rounded-lg border ${
+          i === 0 ? 'bg-red-50/50 border-red-100' : i === 1 ? 'bg-amber-50/50 border-amber-100' : 'bg-orange-50/50 border-orange-100'
+        }`}>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {i === 0 ? '👃' : i === 1 ? '👅' : '✨'} {labels[key][lang]}
+          </label>
+          <FlavorWheel
+            categories={flavorData}
+            selected={flavors[key]}
+            onSelect={f => setFlavors(prev => ({ ...prev, [key]: f }))}
+            maxSelect={10}
+            lang={lang}
+          />
+          <div className="relative mt-2">
+            <textarea
+              placeholder={ui[`${key}Note` as keyof typeof ui][lang]}
+              value={notes[key]}
+              onChange={e => setNotes(n => ({ ...n, [key]: e.target.value }))}
+              rows={2}
+              className="w-full px-3 py-2 pr-20 border rounded-lg focus:ring-2 focus:ring-amber-500 resize-none text-sm"
+            />
+            {notes[key].trim() && (
+              <button
+                onClick={() => handleCorrect(key)}
+                disabled={correcting === key}
+                className="absolute right-2 top-2 flex items-center gap-1 px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50"
+              >
+                <Sparkles size={12} />
+                {correcting === key ? ui.correcting[lang] : ui.aiCorrect[lang]}
+              </button>
+            )}
+          </div>
+        </section>
+      ))}
 
-      {/* Flavor Tags */}
-      <section className="mb-8">
-        <label className="block text-sm font-medium text-gray-700 mb-4">풍미 태그</label>
-        <FlavorSelector
-          tags={flavorTags}
-          selected={selectedFlavors}
-          onSelect={setSelectedFlavors}
-          maxSelect={5}
-        />
-      </section>
-
-      {/* Submit */}
       <button
-        onClick={handleSubmit}
-        disabled={saving || !selectedWhisky}
-        className="w-full py-4 bg-amber-600 text-white font-semibold rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        onClick={() => setStep('preview')}
+        disabled={!whisky.name}
+        className="w-full py-3 bg-amber-600 text-white font-semibold rounded-xl hover:bg-amber-700 disabled:opacity-50"
       >
-        {saving ? '저장 중...' : '리뷰 저장하기'}
+        {ui.preview[lang]} →
       </button>
     </div>
   )
