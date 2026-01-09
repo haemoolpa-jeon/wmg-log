@@ -156,7 +156,6 @@ export default function NewReviewPage() {
           <div style={{ backgroundColor: '#fef3c7' }} className="px-4 py-3 flex items-center justify-between border-b border-amber-200">
             <div className="flex items-center gap-2">
               <span className="text-xl">🥃</span>
-              <span className="font-bold" style={{ color: '#92400e' }}>WmG</span>
             </div>
             <div className="text-sm" style={{ color: '#b45309' }}>📅 {new Date().toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US')}</div>
           </div>
@@ -232,7 +231,6 @@ export default function NewReviewPage() {
           {/* Footer with reviewer */}
           <div className="px-4 py-3 flex items-center justify-between text-xs" style={{ backgroundColor: '#fef9e7', color: '#6b7280' }}>
             {reviewer && <span>by {reviewer}</span>}
-            <span className="ml-auto">WmG Review</span>
           </div>
         </div>
 

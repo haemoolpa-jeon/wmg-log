@@ -8,7 +8,7 @@ import { getCountryFlag } from '@/lib/countries'
 import { PenLine, Trash2, Wine, Globe } from 'lucide-react'
 
 const ui = {
-  appName: { ko: 'WmG Review', en: 'WmG Review' },
+  appName: { ko: 'Whisky Review', en: 'Whisky Review' },
   newReview: { ko: '새 리뷰', en: 'New' },
   noReviews: { ko: '아직 작성한 리뷰가 없습니다', en: 'No reviews yet' },
   firstReview: { ko: '첫 리뷰 작성하기', en: 'Write your first review' },
