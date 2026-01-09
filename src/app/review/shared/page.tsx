@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { Suspense, useState, useRef, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ExportCard } from '@/components/ExportCard'
 import { Lang } from '@/lib/flavors'
@@ -9,7 +9,7 @@ import { domToPng } from 'modern-screenshot'
 import { jsPDF } from 'jspdf'
 import { Download, Check } from 'lucide-react'
 
-export default function SharedReviewPage() {
+function SharedReviewContent() {
   const searchParams = useSearchParams()
   const [lang, setLang] = useState<Lang>('ko')
   const [review, setReview] = useState<ReturnType<typeof decodeReview>>(null)
@@ -93,5 +93,13 @@ export default function SharedReviewPage() {
         {saved ? <><Check size={18} /> {lang === 'ko' ? '저장됨' : 'Saved'}</> : <><Download size={18} /> {lang === 'ko' ? '내 리뷰에 저장' : 'Save to My Reviews'}</>}
       </button>
     </div>
+  )
+}
+
+export default function SharedReviewPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Loading...</div>}>
+      <SharedReviewContent />
+    </Suspense>
   )
 }
