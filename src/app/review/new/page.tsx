@@ -89,7 +89,12 @@ export default function NewReviewPage() {
   const handleExportPNG = async () => {
     if (!cardRef.current) return
     setExporting(true)
-    const canvas = await html2canvas(cardRef.current, { scale: 2, backgroundColor: '#fff' })
+    const canvas = await html2canvas(cardRef.current, { 
+      scale: 2, 
+      backgroundColor: '#fffbeb',
+      useCORS: true,
+      logging: false,
+    })
     const link = document.createElement('a')
     link.download = `${whisky.name || 'review'}.png`
     link.href = canvas.toDataURL('image/png')
@@ -100,7 +105,12 @@ export default function NewReviewPage() {
   const handleExportPDF = async () => {
     if (!cardRef.current) return
     setExporting(true)
-    const canvas = await html2canvas(cardRef.current, { scale: 2, backgroundColor: '#fff' })
+    const canvas = await html2canvas(cardRef.current, { 
+      scale: 2, 
+      backgroundColor: '#fffbeb',
+      useCORS: true,
+      logging: false,
+    })
     const imgData = canvas.toDataURL('image/png')
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const w = pdf.internal.pageSize.getWidth() - 20
@@ -141,32 +151,32 @@ export default function NewReviewPage() {
           </div>
         </div>
 
-        {/* Export Card */}
-        <div ref={cardRef} className="bg-amber-50 rounded-xl border border-amber-200 overflow-hidden mb-4">
-          <div className="bg-amber-100 px-4 py-3 flex items-center justify-between border-b border-amber-200">
+        {/* Export Card - using inline styles for html2canvas compatibility */}
+        <div ref={cardRef} style={{ backgroundColor: '#fffbeb' }} className="rounded-xl border border-amber-200 overflow-hidden mb-4">
+          <div style={{ backgroundColor: '#fef3c7' }} className="px-4 py-3 flex items-center justify-between border-b border-amber-200">
             <div className="flex items-center gap-2">
               <span className="text-xl">🥃</span>
-              <span className="font-bold text-amber-800">WmG</span>
+              <span className="font-bold" style={{ color: '#92400e' }}>WmG</span>
             </div>
-            <div className="text-sm text-amber-700">📅 {new Date().toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US')}</div>
+            <div className="text-sm" style={{ color: '#b45309' }}>📅 {new Date().toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US')}</div>
           </div>
 
           {/* Whisky Info with Color */}
-          <div className="bg-amber-100/50 px-4 py-3 border-b border-amber-200">
+          <div style={{ backgroundColor: '#fef9e7' }} className="px-4 py-3 border-b border-amber-200">
             <div className="flex gap-3">
               <div 
-                className="w-12 h-16 rounded-lg border-2 border-amber-300 flex-shrink-0"
-                style={{ backgroundColor: colorInfo?.hex }}
+                className="w-12 h-16 rounded-lg flex-shrink-0"
+                style={{ backgroundColor: colorInfo?.hex, border: '2px solid #fcd34d' }}
               />
               <div className="flex-1">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-bold text-gray-900">
+                    <p className="font-bold" style={{ color: '#111827' }}>
                       {whisky.country && <span className="mr-1">{getCountryFlag(whisky.country)}</span>}
                       {whisky.name}
                     </p>
-                    <p className="text-sm text-gray-600">{whisky.distillery}</p>
-                    <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
+                    <p className="text-sm" style={{ color: '#4b5563' }}>{whisky.distillery}</p>
+                    <div className="flex flex-wrap gap-2 text-xs mt-1" style={{ color: '#6b7280' }}>
                       {whisky.age && <span>{whisky.age}{lang === 'ko' ? '년' : 'Y'}</span>}
                       {whisky.abv && <span>{whisky.abv}%</span>}
                       {whisky.cask && <span>{whisky.cask}</span>}
@@ -174,8 +184,8 @@ export default function NewReviewPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-amber-700">{total}</div>
-                    <div className="text-xs text-gray-500">/100</div>
+                    <div className="text-2xl font-bold" style={{ color: '#b45309' }}>{total}</div>
+                    <div className="text-xs" style={{ color: '#6b7280' }}>/100</div>
                   </div>
                 </div>
               </div>
@@ -183,12 +193,12 @@ export default function NewReviewPage() {
           </div>
 
           {/* Scores */}
-          <div className="px-4 py-3 border-b border-amber-200 bg-white">
+          <div className="px-4 py-3 border-b border-amber-200" style={{ backgroundColor: '#ffffff' }}>
             <div className="grid grid-cols-4 gap-2 text-center">
               {(['nose', 'palate', 'finish', 'balance'] as const).map(key => (
                 <div key={key}>
-                  <div className="text-lg font-bold text-amber-600">{scores[key]}</div>
-                  <div className="text-[10px] text-gray-500">{labels[key][lang]}</div>
+                  <div className="text-lg font-bold" style={{ color: '#d97706' }}>{scores[key]}</div>
+                  <div className="text-[10px]" style={{ color: '#6b7280' }}>{labels[key][lang]}</div>
                 </div>
               ))}
             </div>
@@ -196,9 +206,9 @@ export default function NewReviewPage() {
 
           {(['nose', 'palate', 'finish'] as const).map(key => (
             (flavors[key].length > 0 || notes[key]) && (
-              <div key={key} className="px-4 py-4 border-b border-amber-200 bg-white">
+              <div key={key} className="px-4 py-4 border-b border-amber-200" style={{ backgroundColor: '#ffffff' }}>
                 <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-bold text-gray-800">{labels[key][lang]}</h3>
+                  <h3 className="font-bold" style={{ color: '#1f2937' }}>{labels[key][lang]}</h3>
                 </div>
                 <div className="flex gap-4">
                   {flavors[key].length > 0 && (
@@ -208,11 +218,11 @@ export default function NewReviewPage() {
                   )}
                   <div className="flex-1 min-w-0">
                     {flavors[key].length > 0 && (
-                      <p className="text-xs text-gray-500 mb-2">
+                      <p className="text-xs mb-2" style={{ color: '#6b7280' }}>
                         {flavors[key].map(f => getTagName(f.id, lang)).join(' / ')}
                       </p>
                     )}
-                    {notes[key] && <p className="text-sm text-gray-700 whitespace-pre-wrap">{notes[key]}</p>}
+                    {notes[key] && <p className="text-sm whitespace-pre-wrap" style={{ color: '#374151' }}>{notes[key]}</p>}
                   </div>
                 </div>
               </div>
@@ -220,7 +230,7 @@ export default function NewReviewPage() {
           ))}
 
           {/* Footer with reviewer */}
-          <div className="px-4 py-3 bg-amber-100/50 flex items-center justify-between text-xs text-gray-500">
+          <div className="px-4 py-3 flex items-center justify-between text-xs" style={{ backgroundColor: '#fef9e7', color: '#6b7280' }}>
             {reviewer && <span>by {reviewer}</span>}
             <span className="ml-auto">WmG Review</span>
           </div>
