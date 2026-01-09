@@ -101,7 +101,7 @@ export default function HomePage() {
               const allFlavors = getAllFlavors(review)
               
               return (
-                <div key={review.id} className="bg-white rounded-xl border p-3">
+                <Link href={`/review/${review.id}`} key={review.id} className="block bg-white rounded-xl border p-3 hover:border-amber-300 transition-colors">
                   <div className="flex gap-3">
                     {colorInfo && (
                       <div
@@ -138,13 +138,16 @@ export default function HomePage() {
 
                       <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
                         <span>{new Date(review.createdAt).toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US')}</span>
-                        <button onClick={() => handleDelete(review.id)} className="text-red-400 hover:text-red-600">
+                        <button 
+                          onClick={(e) => { e.preventDefault(); handleDelete(review.id) }} 
+                          className="text-red-400 hover:text-red-600"
+                        >
                           <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
               )
             })}
           </div>
