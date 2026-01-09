@@ -54,4 +54,24 @@ export const storage = {
     const reviews = storage.getReviews().filter(r => r.id !== id)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews))
   },
+
+  updateReview: (id: string, data: Omit<Review, 'id' | 'createdAt'>): Review | null => {
+    const reviews = storage.getReviews()
+    const index = reviews.findIndex(r => r.id === id)
+    if (index === -1) return null
+    
+    const updated: Review = {
+      ...data,
+      id,
+      createdAt: reviews[index].createdAt,
+    }
+    reviews[index] = updated
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews))
+    return updated
+  },
+
+  getReview: (id: string): Review | null => {
+    const reviews = storage.getReviews()
+    return reviews.find(r => r.id === id) || null
+  },
 }

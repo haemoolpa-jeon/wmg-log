@@ -8,7 +8,7 @@ import { getCountryFlag } from '@/lib/countries'
 import { storage, Review } from '@/lib/storage'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
-import { Image, FileText, ChevronLeft, Trash2, Globe } from 'lucide-react'
+import { Image, FileText, ChevronLeft, Trash2, Globe, Pencil } from 'lucide-react'
 
 const labels = {
   nose: { ko: '노즈', en: 'Nose' },
@@ -57,12 +57,16 @@ export default function ViewReviewPage() {
         useCORS: true,
         logging: false,
       })
+      const dataUrl = canvas.toDataURL('image/png')
       const link = document.createElement('a')
+      link.href = dataUrl
       link.download = `${review?.whisky.name || 'review'}.png`
-      link.href = canvas.toDataURL('image/png')
+      document.body.appendChild(link)
       link.click()
+      document.body.removeChild(link)
     } catch (e) {
       console.warn('Export error:', e)
+      alert('Export failed')
     } finally {
       setExporting(false)
     }
@@ -86,6 +90,7 @@ export default function ViewReviewPage() {
       pdf.save(`${review?.whisky.name || 'review'}.pdf`)
     } catch (e) {
       console.warn('Export error:', e)
+      alert('Export failed')
     } finally {
       setExporting(false)
     }
@@ -191,12 +196,15 @@ export default function ViewReviewPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mt-4">
+      <div className="grid grid-cols-3 gap-3 mt-4">
         <button onClick={handleExportPNG} disabled={exporting} className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50">
           <Image size={18} /> PNG
         </button>
         <button onClick={handleExportPDF} disabled={exporting} className="flex items-center justify-center gap-2 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50">
           <FileText size={18} /> PDF
+        </button>
+        <button onClick={() => router.push(`/review/${params.id}/edit`)} className="flex items-center justify-center gap-2 py-3 bg-amber-600 text-white rounded-xl hover:bg-amber-700">
+          <Pencil size={18} /> {lang === 'ko' ? '수정' : 'Edit'}
         </button>
       </div>
     </div>
