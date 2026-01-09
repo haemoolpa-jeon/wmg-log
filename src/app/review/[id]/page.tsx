@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ExportCard } from '@/components/ExportCard'
 import { whiskyColors, Lang } from '@/lib/flavors'
 import { storage, Review } from '@/lib/storage'
-import html2canvas from 'html2canvas'
+import { domToPng } from 'modern-screenshot'
 import { jsPDF } from 'jspdf'
 import { Image, FileText, ChevronLeft, Trash2, Globe, Pencil } from 'lucide-react'
 
@@ -43,27 +43,12 @@ export default function ViewReviewPage() {
     if (!cardRef.current || exporting) return
     setExporting(true)
     try {
-      // Clone the card to a temporary container without Tailwind styles
-      const clone = cardRef.current.cloneNode(true) as HTMLElement
-      const container = document.createElement('div')
-      container.style.position = 'absolute'
-      container.style.left = '-9999px'
-      container.style.top = '0'
-      container.appendChild(clone)
-      document.body.appendChild(container)
-      
-      const canvas = await html2canvas(clone, { 
-        scale: 2, 
+      const dataUrl = await domToPng(cardRef.current, {
+        scale: 2,
         backgroundColor: '#fffbeb',
-        useCORS: true,
-        logging: false,
-        removeContainer: true,
       })
-      
-      document.body.removeChild(container)
-      
       const link = document.createElement('a')
-      link.href = canvas.toDataURL('image/png')
+      link.href = dataUrl
       link.download = `${review?.whisky.name || 'review'}.png`
       link.click()
     } catch (e) {
@@ -77,29 +62,19 @@ export default function ViewReviewPage() {
     if (!cardRef.current || exporting) return
     setExporting(true)
     try {
-      const clone = cardRef.current.cloneNode(true) as HTMLElement
-      const container = document.createElement('div')
-      container.style.position = 'absolute'
-      container.style.left = '-9999px'
-      container.style.top = '0'
-      container.appendChild(clone)
-      document.body.appendChild(container)
-      
-      const canvas = await html2canvas(clone, { 
-        scale: 2, 
+      const dataUrl = await domToPng(cardRef.current, {
+        scale: 2,
         backgroundColor: '#fffbeb',
-        useCORS: true,
-        logging: false,
-        removeContainer: true,
       })
       
-      document.body.removeChild(container)
+      const img = new window.Image()
+      img.src = dataUrl
+      await new Promise(resolve => { img.onload = resolve })
       
-      const imgData = canvas.toDataURL('image/png')
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
       const w = pdf.internal.pageSize.getWidth() - 20
-      const h = (canvas.height * w) / canvas.width
-      pdf.addImage(imgData, 'PNG', 10, 10, w, h)
+      const h = (img.height * w) / img.width
+      pdf.addImage(dataUrl, 'PNG', 10, 10, w, h)
       pdf.save(`${review?.whisky.name || 'review'}.pdf`)
     } catch (e) {
       console.warn('Export error:', e)

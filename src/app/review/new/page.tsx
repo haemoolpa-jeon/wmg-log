@@ -7,7 +7,7 @@ import { FlavorRadar } from '@/components/FlavorRadar'
 import { flavorData, getTagName, whiskyColors, Lang } from '@/lib/flavors'
 import { countries, getCountryFlag, correctText } from '@/lib/countries'
 import { storage, FlavorWithStrength } from '@/lib/storage'
-import html2canvas from 'html2canvas'
+import { domToPng } from 'modern-screenshot'
 import { jsPDF } from 'jspdf'
 import { Download, Image, FileText, ChevronLeft, RotateCcw, Globe, Sparkles } from 'lucide-react'
 
@@ -90,16 +90,10 @@ export default function NewReviewPage() {
     if (!cardRef.current || exporting) return
     setExporting(true)
     try {
-      const canvas = await html2canvas(cardRef.current, { 
-        scale: 2, 
-        backgroundColor: '#fffbeb',
-        useCORS: true,
-        logging: false,
-        ignoreElements: (element) => element.tagName === 'STYLE',
-      })
+      const dataUrl = await domToPng(cardRef.current, { scale: 2, backgroundColor: '#fffbeb' })
       const link = document.createElement('a')
+      link.href = dataUrl
       link.download = `${whisky.name || 'review'}.png`
-      link.href = canvas.toDataURL('image/png')
       link.click()
     } catch (e) {
       console.warn('Export error:', e)
@@ -112,18 +106,14 @@ export default function NewReviewPage() {
     if (!cardRef.current || exporting) return
     setExporting(true)
     try {
-      const canvas = await html2canvas(cardRef.current, { 
-        scale: 2, 
-        backgroundColor: '#fffbeb',
-        useCORS: true,
-        logging: false,
-        ignoreElements: (element) => element.tagName === 'STYLE',
-      })
-      const imgData = canvas.toDataURL('image/png')
+      const dataUrl = await domToPng(cardRef.current, { scale: 2, backgroundColor: '#fffbeb' })
+      const img = new window.Image()
+      img.src = dataUrl
+      await new Promise(resolve => { img.onload = resolve })
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
       const w = pdf.internal.pageSize.getWidth() - 20
-      const h = (canvas.height * w) / canvas.width
-      pdf.addImage(imgData, 'PNG', 10, 10, w, h)
+      const h = (img.height * w) / img.width
+      pdf.addImage(dataUrl, 'PNG', 10, 10, w, h)
       pdf.save(`${whisky.name || 'review'}.pdf`)
     } catch (e) {
       console.warn('Export error:', e)
