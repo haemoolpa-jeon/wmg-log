@@ -87,37 +87,43 @@ export default function NewReviewPage() {
   const colorInfo = whiskyColors.find(c => c.value === whisky.color)
 
   const handleExportPNG = async () => {
-    if (!cardRef.current) return
+    if (!cardRef.current || exporting) return
     setExporting(true)
-    const canvas = await html2canvas(cardRef.current, { 
-      scale: 2, 
-      backgroundColor: '#fffbeb',
-      useCORS: true,
-      logging: false,
-    })
-    const link = document.createElement('a')
-    link.download = `${whisky.name || 'review'}.png`
-    link.href = canvas.toDataURL('image/png')
-    link.click()
-    setExporting(false)
+    try {
+      const canvas = await html2canvas(cardRef.current, { 
+        scale: 2, 
+        backgroundColor: '#fffbeb',
+        useCORS: true,
+        logging: false,
+      })
+      const link = document.createElement('a')
+      link.download = `${whisky.name || 'review'}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    } finally {
+      setExporting(false)
+    }
   }
 
   const handleExportPDF = async () => {
-    if (!cardRef.current) return
+    if (!cardRef.current || exporting) return
     setExporting(true)
-    const canvas = await html2canvas(cardRef.current, { 
-      scale: 2, 
-      backgroundColor: '#fffbeb',
-      useCORS: true,
-      logging: false,
-    })
-    const imgData = canvas.toDataURL('image/png')
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    const w = pdf.internal.pageSize.getWidth() - 20
-    const h = (canvas.height * w) / canvas.width
-    pdf.addImage(imgData, 'PNG', 10, 10, w, h)
-    pdf.save(`${whisky.name || 'review'}.pdf`)
-    setExporting(false)
+    try {
+      const canvas = await html2canvas(cardRef.current, { 
+        scale: 2, 
+        backgroundColor: '#fffbeb',
+        useCORS: true,
+        logging: false,
+      })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const w = pdf.internal.pageSize.getWidth() - 20
+      const h = (canvas.height * w) / canvas.width
+      pdf.addImage(imgData, 'PNG', 10, 10, w, h)
+      pdf.save(`${whisky.name || 'review'}.pdf`)
+    } finally {
+      setExporting(false)
+    }
   }
 
   const handleSave = () => {
